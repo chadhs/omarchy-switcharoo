@@ -619,6 +619,12 @@ Item {
       "eval",
       "return hl.dispatch(hl.dsp.focus({ window = 'address:" + address + "' }))"
     ])
+    // LOCAL PATCH (raise-front): Hyprland renders all floats above all tiles,
+    // so plain focus leaves a committed tiled window invisible when a
+    // floating window overlaps it. Raise it to front; if covered, float it
+    // in place first (tiled geometry preserved). Repo-owned helper:
+    // ~/dotfiles/omarchy/bin/omarchy-window-raise-front.
+    Quickshell.execDetached(["omarchy-window-raise-front", address])
   }
 
   // Public IPC method for callers that want to commit the current selection
