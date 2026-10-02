@@ -71,12 +71,39 @@ Item {
 
   function shellEntry() {
     var config = root.shell && root.shell.shellConfig ? root.shell.shellConfig : null
+    // LOCAL PATCH (config-fallback): current omarchy shells no longer expose
+    // `shellConfig` on the plugin shell API, so every shell.json setting (e.g.
+    // releaseModifiers) was silently ignored. Read the user's shell.json
+    // directly as a fallback, cached briefly to keep repeat presses cheap.
+    if (!config) config = root.readShellConfigFromFile()
     var plugins = config && Array.isArray(config.plugins) ? config.plugins : []
     var id = root.pluginId()
     for (var i = 0; i < plugins.length; i++) {
       if (plugins[i] && String(plugins[i].id || "") === id) return plugins[i]
     }
     return {}
+  }
+
+  // LOCAL PATCH (config-fallback): short-lived cache for the direct
+  // shell.json read, so tab autorepeat at 40 ms does not reparse the file.
+  property var _fileShellConfigCache: null
+  property real _fileShellConfigAt: 0
+
+  function readShellConfigFromFile() {
+    var now = Date.now()
+    if (root._fileShellConfigCache !== null && now - root._fileShellConfigAt < 2000)
+      return root._fileShellConfigCache
+    var parsed = null
+    try {
+      userShellConfigView.path = Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+      parsed = JSON.parse(String(userShellConfigView.text() || ""))
+    } catch (error) {
+      parsed = null
+    }
+    if (!parsed || typeof parsed !== "object" || parsed.version !== 1) parsed = null
+    root._fileShellConfigCache = parsed
+    root._fileShellConfigAt = now
+    return parsed
   }
 
   function parsePayload(payloadJson) {
@@ -818,6 +845,15 @@ Item {
 
   FileView {
     id: cmdlineView
+    preload: false
+    blockAllReads: true
+    printErrors: false
+  }
+
+  // LOCAL PATCH (config-fallback): direct read of the user's shell.json when
+  // the shell API does not expose shellConfig. Mirrors cmdlineView usage.
+  FileView {
+    id: userShellConfigView
     preload: false
     blockAllReads: true
     printErrors: false
